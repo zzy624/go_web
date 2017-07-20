@@ -1,0 +1,151 @@
+#!/bin/bash
+
+WORKSPACE=$(cd $(dirname $0)/; pwd)
+cd $WORKSPACE
+
+repository=go_web
+app=go_web
+
+pidfile=var/app.pid
+logfile=var/app.log
+
+function check_pid() {
+    if [ -f $pidfile ];then
+        pid=`cat $pidfile`
+        if [ -n $pid ]; then
+            running=`ps -p $pid|grep -v "PID TTY" |wc -l`
+            return $running
+        fi
+    fi
+    return 0
+}
+
+function start() {
+    check_pid
+    running=$?
+    if [ $running -gt 0 ];then
+        echo -n "$app now is running already, pid="
+        cat $pidfile
+        return 1
+    fi
+
+    nohup ./$app &> $logfile &
+    sleep 1
+    running=`ps -p $! | grep -v "PID TTY" | wc -l`
+    if [ $running -gt 0 ];then
+        echo $! > $pidfile
+        echo "$app started..., pid=$!"
+    else
+        echo "$app failed to start"
+        return 1
+    fi
+}
+
+function stop() {
+    check_pid
+    running=$?
+    if [ $running -gt 0 ];then
+        pid=`cat $pidfile`
+        kill $pid
+        rm -f $pidfile
+        echo "$app stoped"
+    else
+        echo "$app already stoped"
+    fi
+}
+
+function restart() {
+    stop
+    sleep 1
+    start
+}
+
+function status() {
+    check_pid
+    running=$?
+    if [ $running -gt 0 ];then
+        echo "started"
+    else
+        echo "stoped"
+    fi
+}
+
+function tailf() {
+    tail -f $logfile
+}
+
+function build() {
+    goimports -l -w -local "code.qschou.com/" ./app
+    go build -o $app ./app
+    if [ $? -ne 0 ]; then
+        exit $?
+    fi
+}
+
+function pack() {
+    build
+    version=`./$app -v`
+    tar zcvf $app-$version.tar.gz control cfg.json $app
+}
+
+function packbin() {
+    build
+    version=`./$app -v`
+    tar zcvf $app-bin-$version.tar.gz $app
+}
+
+function help() {
+    echo "$0 start|stop|restart|status|tail|build|pack|packbin|pid|reload|deploy"
+}
+
+function pid() {
+    cat $pidfile
+}
+
+function reload() {
+    build
+    restart
+    tailf
+}
+
+function deploy() {
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $app ./app
+    for ip in 101.200.42.234
+    do
+        ssh root@${ip} "mkdir -p /home/golanger/go/src/$repository"
+        ssh root@${ip} "mkdir -p /home/golanger/go/src/$repository/var"
+        ssh root@${ip} "/home/golanger/go/src/$repository/control stop"
+        scp -r $app root@${ip}:/home/golanger/go/src/$repository/
+        scp -r control root@${ip}:/home/golanger/go/src/$repository/
+        ssh root@${ip} "chmod +x /home/golanger/go/src/$repository/control && chmod +x /home/golanger/go/src/$repository/$app && /home/golanger/go/src/$repository/control start"
+        echo "${ip} ----> $app deploy";
+    done
+}
+
+if [ "$1" == "" ]; then
+    help
+elif [ "$1" == "stop" ];then
+    stop
+elif [ "$1" == "start" ];then
+    start
+elif [ "$1" == "restart" ];then
+    restart
+elif [ "$1" == "status" ];then
+    status
+elif [ "$1" == "tail" ];then
+    tailf
+elif [ "$1" == "build" ];then
+    build
+elif [ "$1" == "pack" ];then
+    pack
+elif [ "$1" == "packbin" ];then
+    packbin
+elif [ "$1" == "pid" ];then
+    pid
+elif [ "$1" == "reload" ];then
+    reload
+elif [ "$1" == "deploy" ];then
+    deploy
+else
+    help
+fi
