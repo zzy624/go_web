@@ -5,7 +5,7 @@ package log
 import (
 	"io"
 
-	"github.com/mattn/go-colorable"
+	colorable "github.com/mattn/go-colorable"
 )
 
 func output() io.Writer {
