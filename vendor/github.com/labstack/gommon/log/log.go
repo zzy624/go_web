@@ -13,7 +13,7 @@ import (
 
 	"strconv"
 
-	isatty "github.com/mattn/go-isatty"
+	"github.com/mattn/go-isatty"
 	"github.com/valyala/fasttemplate"
 
 	"github.com/labstack/gommon/color"

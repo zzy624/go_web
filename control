@@ -75,7 +75,7 @@ function tailf() {
 }
 
 function build() {
-    goimports -l -w -local "code.qschou.com/" ./app
+    goimports -l -w ./app
     go build -o $app ./app
     if [ $? -ne 0 ]; then
         exit $?
@@ -116,6 +116,7 @@ function deploy() {
         ssh root@${ip} "mkdir -p /home/golanger/go/src/$repository/var"
         ssh root@${ip} "/home/golanger/go/src/$repository/control stop"
         scp -r $app root@${ip}:/home/golanger/go/src/$repository/
+        scp -r testDB.db root@${ip}:/home/golanger/go/src/$repository/
         scp -r control root@${ip}:/home/golanger/go/src/$repository/
         ssh root@${ip} "chmod +x /home/golanger/go/src/$repository/control && chmod +x /home/golanger/go/src/$repository/$app && /home/golanger/go/src/$repository/control start"
         echo "${ip} ----> $app deploy";
